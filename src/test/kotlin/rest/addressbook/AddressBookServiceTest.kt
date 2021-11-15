@@ -39,6 +39,10 @@ class AddressBookServiceTest {
         // Verify that GET /contacts is well implemented by the service, i.e
         // complete the test to ensure that it is safe and idempotent
         //////////////////////////////////////////////////////////////////////
+
+        //it will be safe and inmpotent if the server didn't change the elements of the 
+        // list before the Get is done. 
+        assertEquals(0,addressBook.personList.size)
     }
 
     @Test
@@ -73,6 +77,25 @@ class AddressBookServiceTest {
         // Verify that POST /contacts is well implemented by the service, i.e
         // complete the test to ensure that it is not safe and not idempotent
         //////////////////////////////////////////////////////////////////////
+
+        //test it is not safe
+        // after creation of the new user, the size of the list has incremented by 1 
+        assertEquals(1,addressBook.personList.size)
+
+        //test it is not idemponten, that meanse if you create again the same user with
+        // the same data, it will create a new user incrementing by 1 again list's size. 
+        val juanURI2: URI = URI.create("http://localhost:$port/contacts/person/2") 
+        response = restTemplate.postForEntity("http://localhost:$port/contacts", juan, Person::class.java)
+
+        assertEquals(201, response.statusCode.value())
+        assertEquals(juanURI2, response.headers.location)
+        assertEquals(MediaType.APPLICATION_JSON, response.headers.contentType)
+        juanUpdated = response.body
+        assertEquals(juan.name, juanUpdated?.name)
+        assertEquals(2, juanUpdated?.id)
+        assertEquals(juanURI, juanUpdated?.href)
+
+        assertEquals(2,addressBook.personList.size)
     }
 
     @Test
@@ -117,6 +140,24 @@ class AddressBookServiceTest {
         // Verify that GET /contacts/person/3 is well implemented by the service, i.e
         // complete the test to ensure that it is safe and idempotent
         //////////////////////////////////////////////////////////////////////
+
+        //test is safe and idempotent. list size must stay the same after create a new user 
+
+        val sizeBefore = addressBook.personList.size
+        // create again the same user MAria 
+        response = restTemplate.getForEntity(mariaURI, Person::class.java)
+
+        assertEquals(200, response.statusCode.value())
+        assertEquals(MediaType.APPLICATION_JSON, response.headers.contentType)
+        mariaUpdated = response.body
+        assertEquals(maria.name, mariaUpdated?.name)
+        assertEquals(3, mariaUpdated?.id)
+        assertEquals(mariaURI, mariaUpdated?.href)
+
+        val sizeAfter= addressBook.personList.size
+
+        //check before and after size are equals
+        assertEquals(sizeBefore,sizeAfter)
     }
 
     @Test
@@ -139,6 +180,20 @@ class AddressBookServiceTest {
         // Verify that GET /contacts is well implemented by the service, i.e
         // complete the test to ensure that it is safe and idempotent
         //////////////////////////////////////////////////////////////////////
+
+        // list size doesn't change after do the GET 
+
+        val sizeBefore = addressBook.personList.size
+        response2 = restTemplate.getForEntity("http://localhost:$port/contacts", Array<Person>::class.java)
+        assertEquals(200, response2.statusCode.value())
+        assertEquals(MediaType.APPLICATION_JSON, response2.headers.contentType)
+        assertEquals(2, response2.body?.size)
+        assertEquals(juan.name, response2.body?.get(1)?.name)
+        assertEquals(salvador.name, response2.body?.get(0)?.name)
+
+        val sizeAfter = addressBook.personList.size
+
+        assertEquals (sizeBefore,sizeAfter)
     }
 
     @Test
@@ -178,6 +233,17 @@ class AddressBookServiceTest {
         // Verify that PUT /contacts/person/2 is well implemented by the service, i.e
         // complete the test to ensure that it is idempotent but not safe
         //////////////////////////////////////////////////////////////////////
+
+        var response2 = restTemplate.exchange(juanURI, HttpMethod.PUT, HttpEntity(maria), Person::class.java)
+        assertEquals(204, response2.statusCode.value())
+
+        response2 = restTemplate.getForEntity(juanURI, Person::class.java)
+        assertEquals(200, response2.statusCode.value())
+        assertEquals(MediaType.APPLICATION_JSON, response2.headers.contentType)
+        val updatedMaria2 = response2.body
+        assertEquals(maria.name, updatedMaria2?.name)
+        assertEquals(2, updatedMaria2?.id)
+        assertEquals(juanURI, updatedMaria2?.href)
     }
 
     @Test
@@ -189,9 +255,12 @@ class AddressBookServiceTest {
         addressBook.personList.add(salvador)
         addressBook.personList.add(juan)
 
+
+        val sizeBefore = addressBook.personList.size
         // Delete a user
         restTemplate.execute(juanURI, HttpMethod.DELETE, {}, { assertEquals(204, it.statusCode.value()) })
 
+        val sizeAfter = addressBook.personList.size
         // Verify that the user has been deleted
         restTemplate.execute(juanURI, HttpMethod.GET, {}, { assertEquals(404, it.statusCode.value()) })
 
@@ -199,6 +268,12 @@ class AddressBookServiceTest {
         // Verify that DELETE /contacts/person/2 is well implemented by the service, i.e
         // complete the test to ensure that it is idempotent but not safe
         //////////////////////////////////////////////////////////////////////
+
+        assertNotEquals(sizeBefore,sizeAfter)
+        restTemplate.execute(juanURI, HttpMethod.DELETE, {}, { assertEquals(204, it.statusCode.value()) })
+
+        
+
     }
 
     @Test
